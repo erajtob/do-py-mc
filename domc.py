@@ -41,7 +41,7 @@ def wait_for_action_completion(droplet, action_type):
             if action.type == action_type and action.status == 'completed':
                 action_complete = True
                 break
-        time.sleep(5)
+        time.sleep(3)
     logging.info(f"Action {action_type} completed for droplet {droplet.id}.")
     print(f"Action {action_type} completed for droplet {droplet.id}.")
 
@@ -53,7 +53,7 @@ def wait_for_volume_detachment(manager, droplet_id, volume_id):
             logging.info(f"Volume {volume_id} successfully detached from droplet {droplet_id}.")
             print(f"Volume {volume_id} successfully detached from droplet {droplet_id}.")
             break
-        time.sleep(5)
+        time.sleep(3)
 
 def cleanup_droplet(manager, droplet_id):
     try:

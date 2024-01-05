@@ -1,0 +1,4 @@
+{
+    "API": "your_digitalocean_api_token_here",
+    "VOLUME": "your_volume_id_here",
+}
