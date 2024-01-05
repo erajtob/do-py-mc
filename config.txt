@@ -1,2 +1,0 @@
-API=digital_ocean_API_TOKEN_here
-VOLUME=1151e9e8-ab8d-11ee-8603-0a58ac14ba9d
