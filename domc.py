@@ -4,13 +4,13 @@ import time
 import logging
 import datetime
 import os
+import json
 
 # Setup logging
 logging.basicConfig(filename='latest.log', level=logging.INFO, format='%(asctime)s %(message)s')
 
 def read_config():
-    config = {'API': None, 'VOLUME': None}
-    config_path = 'config.txt'
+    config_path = 'config.json'
 
     if not os.path.exists(config_path):
         logging.error(f"Configuration file not found: {config_path}")
@@ -18,19 +18,29 @@ def read_config():
 
     try:
         with open(config_path, 'r') as file:
-            for line in file:
-                if line.startswith('API='):
-                    config['API'] = line.strip().split('=')[1]
-                elif line.startswith('VOLUME='):
-                    config['VOLUME'] = line.strip().split('=')[1]
-    except IOError as e:
-        logging.error(f"Error reading configuration file: {e}")
-        raise IOError(f"Error reading configuration file: {e}")
+            config = json.load(file)
+    except json.JSONDecodeError as e:
+        logging.error(f"Error parsing configuration file: {e}")
+        raise
 
-    if not config['API']:
-        raise ValueError("API token not found in config file")
+    if 'API' not in config or 'VOLUME' not in config:
+        raise ValueError("Required configuration fields missing")
 
     return config
+
+def read_snapshot_info():
+    snapshot_info_path = 'snapshot_info.json'
+    if not os.path.exists(snapshot_info_path):
+        return {}  # Return empty dict if file doesn't exist
+
+    with open(snapshot_info_path, 'r') as file:
+        return json.load(file)
+
+def update_snapshot_info(snapshot_id):
+    snapshot_info_path = 'snapshot_info.json'
+    with open(snapshot_info_path, 'w') as file:
+        json.dump({"SNAPSHOT_ID": snapshot_id}, file, indent=4)
+    logging.info(f"Snapshot information updated: {snapshot_id}")
 
 def wait_for_action_completion(droplet, action_type):
     action_complete = False
@@ -112,10 +122,14 @@ def create_droplet(manager, volume):
             cleanup_droplet(manager, droplet.id)
 
 def restore_droplet_from_snapshot(manager, volume_id):
-    # Read snapshot ID from file
-    with open('snapshot_id.txt', 'r') as file:
-        snapshot_id = file.read().strip()
+    # Read snapshot ID from snapshot_info.json
+    snapshot_info = read_snapshot_info()
+    snapshot_id = snapshot_info.get("SNAPSHOT_ID")
 
+    if not snapshot_id:
+        logging.error("No snapshot ID found in snapshot_info.json.")
+        print("No snapshot ID found in snapshot_info.json.")
+        return
     # Check if the snapshot ID exists
     try:
         snapshot = manager.get_image(snapshot_id)
@@ -191,8 +205,8 @@ def shutdown_and_snapshot(manager, droplet_id, skip_snapshot=False):
             print(f"Snapshot completed with ID: {snapshot_id}")
 
             # Save snapshot ID
-            with open('snapshot_id.txt', 'w') as file:
-                file.write(str(snapshot_id))
+            update_snapshot_info(snapshot_id)
+
         else:
             logging.error(f"No snapshot with name {snapshot_name} found.")
             print(f"No snapshot with name {snapshot_name} found.")
@@ -226,4 +240,9 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        print(f"An error occurred: {e}")
+        sys.exit(1)
