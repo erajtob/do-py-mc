@@ -11,7 +11,7 @@ import json
 load_dotenv()
 
 # Setup logging
-logging.basicConfig(filename='latest.log', level=logging.INFO, format='%(asctime)s %(message)s')
+logging.basicConfig(filename='latest.log', level=logging.DEBUG, format='%(asctime)s %(message)s')
 
 def get_api_token():
     return os.environ.get('DO_API_TOKEN')
@@ -35,6 +35,18 @@ def read_config():
 
     return config
 
+def extract_snapshot_details(snapshot):
+    return {
+        'id': snapshot.id,
+        'name': snapshot.name,
+        'regions': snapshot.regions,
+        'created_at': snapshot.created_at,
+        'resource_id': snapshot.resource_id,  # Adjust as needed
+        'resource_type': snapshot.resource_type,  # Adjust as needed
+        'min_disk_size': snapshot.min_disk_size,
+        'size_gigabytes': snapshot.size_gigabytes
+    }
+
 def read_snapshot_info():
     snapshot_info_path = 'snapshot_info.json'
     if not os.path.exists(snapshot_info_path):
@@ -43,11 +55,23 @@ def read_snapshot_info():
     with open(snapshot_info_path, 'r') as file:
         return json.load(file)
 
-def update_snapshot_info(snapshot_id):
+def update_snapshot_info(snapshot):
     snapshot_info_path = 'snapshot_info.json'
+    snapshot_data = {
+        "id": snapshot['id'],
+        "name": snapshot['name'],
+        "regions": snapshot['regions'],
+        "created_at": snapshot['created_at'],
+        "resource_id": snapshot['resource_id'],
+        "resource_type": snapshot['resource_type'],
+        "min_disk_size": snapshot['min_disk_size'],
+        "size_gigabytes": snapshot['size_gigabytes']
+        # Add any other fields you want to store
+    }
+
     with open(snapshot_info_path, 'w') as file:
-        json.dump({"SNAPSHOT_ID": snapshot_id}, file, indent=4)
-    logging.info(f"Snapshot information updated: {snapshot_id}")
+        json.dump(snapshot_data, file, indent=4)
+    logging.info(f"Snapshot information updated for {snapshot['id']}")
 
 def wait_for_action_completion(droplet, action_type):
     action_complete = False
@@ -131,13 +155,17 @@ def create_droplet(manager, volume):
 def restore_droplet_from_snapshot(manager, volume_id):
     # Read snapshot ID from snapshot_info.json
     snapshot_info = read_snapshot_info()
-    snapshot_id = snapshot_info.get("SNAPSHOT_ID")
-
-    if not snapshot_id:
-        logging.error("No snapshot ID found in snapshot_info.json.")
-        print("No snapshot ID found in snapshot_info.json.")
+    if not snapshot_info:
+        logging.error("No snapshot information found.")
+        print("No snapshot information found.")
         return
-    # Check if the snapshot ID exists
+
+    snapshot_id = snapshot_info.get("id")
+    if not snapshot_id:
+        logging.error("No snapshot ID found in snapshot information.")
+        print("No snapshot ID found in snapshot information.")
+        return
+
     try:
         snapshot = manager.get_image(snapshot_id)
         logging.info(f"Snapshot found: {snapshot_id}")
@@ -145,7 +173,6 @@ def restore_droplet_from_snapshot(manager, volume_id):
         logging.error(f"Snapshot ID not found: {snapshot_id}")
         print(f"Snapshot ID not found: {snapshot_id}")
         return
-
     keys = manager.get_all_sshkeys()
 
     # Create a droplet from the snapshot with the volume attached
@@ -207,13 +234,10 @@ def shutdown_and_snapshot(manager, droplet_id, skip_snapshot=False):
         my_snapshot = next((snap for snap in snapshots if snap.name == snapshot_name), None)
 
         if my_snapshot:
-            snapshot_id = my_snapshot.id
-            logging.info(f"Snapshot completed with ID: {snapshot_id}")
-            print(f"Snapshot completed with ID: {snapshot_id}")
-
-            # Save snapshot ID
-            update_snapshot_info(snapshot_id)
-
+            snapshot_details = extract_snapshot_details(my_snapshot)
+            logging.info(f"Snapshot completed with ID: {my_snapshot.id}")
+            print(f"Snapshot completed with ID: {my_snapshot.id}")
+            update_snapshot_info(snapshot_details)
         else:
             logging.error(f"No snapshot with name {snapshot_name} found.")
             print(f"No snapshot with name {snapshot_name} found.")
