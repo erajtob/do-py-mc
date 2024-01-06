@@ -3,3 +3,4 @@ config.txt
 snapshot_id.txt
 config.json
 snapshot_info.json
+.env

@@ -3,11 +3,18 @@ import sys
 import time
 import logging
 import datetime
+from dotenv import load_dotenv
 import os
 import json
 
+# Load API from .env
+load_dotenv()
+
 # Setup logging
 logging.basicConfig(filename='latest.log', level=logging.INFO, format='%(asctime)s %(message)s')
+
+def get_api_token():
+    return os.environ.get('DO_API_TOKEN')
 
 def read_config():
     config_path = 'config.json'
@@ -23,7 +30,7 @@ def read_config():
         logging.error(f"Error parsing configuration file: {e}")
         raise
 
-    if 'API' not in config or 'VOLUME' not in config:
+    if 'VOLUME' not in config:
         raise ValueError("Required configuration fields missing")
 
     return config
@@ -218,7 +225,8 @@ def shutdown_and_snapshot(manager, droplet_id, skip_snapshot=False):
 
 def main():
     config = read_config()
-    manager = digitalocean.Manager(token=config['API'])
+    api = get_api_token()
+    manager = digitalocean.Manager(token=api)
 
     if len(sys.argv) < 2:
         print("Usage: python script.py [create|destroy|restore]")
